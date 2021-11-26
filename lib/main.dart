@@ -1,144 +1,186 @@
+// ignore_for_file: prefer_const_constructors, unrelated_type_equality_checks
+
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+
+class MyState extends ChangeNotifier {
+  final List<Reminder> _list = [];
+
+  List<Reminder> get list => _list;
+  void getList() {}
+
+  void newTask(Reminder task) {
+    _list.add(task);
+    notifyListeners();
+  }
+
+  void removeTask(Reminder task) {
+    _list.remove(task);
+    notifyListeners();
+  }
+
+  //work in progress
+}
 
 void main() {
-  runApp(const MyApp());
+  var state = MyState();
+  state.getList();
+
+  runApp(
+    ChangeNotifierProvider(
+      create: (context) => state,
+      child: MyApp(),
+    ),
+  );
 }
 
 class MyApp extends StatelessWidget {
   const MyApp({Key? key}) : super(key: key);
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: '<TIG169 ToDo>',
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
-      ),
-      home: const MyHomePage(title: 'TIG169 ToDo'),
+      home: MainPage(),
     );
   }
 }
 
-class MyHomePage extends StatefulWidget {
-  const MyHomePage({Key? key, required this.title}) : super(key: key);
-
-  final String title;
+class MainPage extends StatefulWidget {
+  const MainPage({Key? key, listOfReminders}) : super(key: key);
 
   @override
-  State<MyHomePage> createState() => _MyHomePageState();
+  State<StatefulWidget> createState() {
+    return MainPageState();
+  }
 }
 
 //startsida
+//innehåller:
+//  - filtreringsknapp (work in progress),
+//  - listan
+//  - samt knapp för att skapa ny påminnelse
 
-class _MyHomePageState extends State<MyHomePage> {
-  String dropdownValue = 'All';
-
+class MainPageState extends State<StatefulWidget> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.title),
+        title: Text('TIG169 ToDo'),
         centerTitle: true,
         actions: [
           Container(
-            child: dropdownFilter(),
+            child: filterListButton(),
             margin: const EdgeInsets.only(right: 15),
-          ),
+          )
         ],
       ),
       body: Center(
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.start,
-          children: <Widget>[
-            reminderRow(),
-            reminderRow(),
+          children: [
+            (Consumer<MyState>(
+              builder: (context, state, child) => ReminderList(state._list),
+            )),
           ],
         ),
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          Navigator.push(context,
-              MaterialPageRoute(builder: (context) => const SecondPage()));
-        },
         tooltip: 'Create new action',
         child: const Icon(
           Icons.add,
           color: Colors.white,
           size: 50,
         ),
-      ),
-    );
-  }
+        onPressed: () async {
+          var addreminder = await Navigator.push(
+            context,
+            MaterialPageRoute(
+                builder: (context) => SecondPage(Reminder(variabletext: ''))),
+          );
 
-  //rad som innehåller checkboxen, påminnelsetexten och soptunnan
-  Widget reminderRow() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Container(
-            margin:
-                const EdgeInsets.only(left: 10, right: 10, top: 20, bottom: 15),
-            child: Checkbox(
-              value: false,
-              onChanged: (val) {},
-            )),
-        Container(
-          constraints: const BoxConstraints(minWidth: 255, maxWidth: 255),
-          margin: const EdgeInsets.only(top: 20, bottom: 15),
-          child: Text(
-            //text för påminnelsen
-            'Påminnelse',
-            style: Theme.of(context).textTheme.headline5,
-            textAlign: TextAlign.start,
-          ),
-        ),
-        Container(
-            margin:
-                const EdgeInsets.only(left: 20, right: 10, top: 20, bottom: 15),
-            child: deleteButton())
-      ],
-    );
-  }
-
-  //soptunneknappen
-  Widget deleteButton() {
-    return Column(children: <Widget>[
-      IconButton(
-        icon: const Icon(Icons.delete),
-        onPressed: () {
-          // work in progress
+          if (addreminder != null) {
+            Provider.of<MyState>(context, listen: false).newTask(addreminder);
+          }
         },
       ),
-    ]);
+    );
   }
 
-  //kuggen i appbaren för att filtrera
-  Widget dropdownFilter() {
-    return DropdownButton<String>(
-      icon: const Icon(
-        Icons.miscellaneous_services,
-        color: Colors.white,
-      ),
-      onChanged: (String? newValue) {
-        setState(() {
-          dropdownValue = newValue!;
-        });
+  //filtrering av påminnelser (work in progress)
+  //  Alternativ: "all", "done" och "not done"
+  Widget filterListButton() {
+    return PopupMenuButton(
+      icon: const Icon(Icons.miscellaneous_services),
+      offset: const Offset(0, 50),
+      onSelected: (value) {
+        // Provider.of<MyState>(context, listen: false).filterList(value);
       },
-      items: <String>['All', 'Done', 'Undone']
-          .map<DropdownMenuItem<String>>((String value) {
-        return DropdownMenuItem<String>(
-          value: value,
-          child: Text(value),
-        );
-      }).toList(),
-      //iconSize: 30,
+      itemBuilder: (context) => [
+        const PopupMenuItem(child: Text('All'), value: 0),
+        const PopupMenuItem(child: Text('Done'), value: 1),
+        const PopupMenuItem(child: Text('Not done'), value: 2)
+      ],
     );
   }
 }
 
-//sidan för att lägga till ny påminnelse
+//hanterar kryssrutorna
+class Checkboxes extends StatefulWidget {
+  const Checkboxes({Key? key, bool? value}) : super(key: key);
 
-class SecondPage extends StatelessWidget {
-  const SecondPage({Key? key}) : super(key: key);
+  @override
+  State<Checkboxes> createState() => CheckboxState();
+}
+
+class CheckboxState extends State<Checkboxes> {
+  late bool isChecked = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return Checkbox(
+      value: isChecked,
+      onChanged: (bool? value) {
+        setState(() {
+          isChecked = value!;
+        });
+      },
+    );
+  }
+}
+
+class SecondPage extends StatefulWidget {
+  final Reminder task;
+
+  const SecondPage(this.task, {Key? key}) : super(key: key);
+
+  @override
+  State<StatefulWidget> createState() {
+    // ignore: no_logic_in_create_state
+    return _SecondPage(task);
+  }
+}
+
+//andra sidan
+//innehåller
+//  - förklarande text
+//  - textfältet för inmatning av påminnelse
+//  - knapp för att lägga till påminnelse
+class _SecondPage extends State<SecondPage> {
+  late String variabletext;
+  late TextEditingController fromInputField;
+
+  _SecondPage(Reminder task) {
+    variabletext = task.variabletext;
+
+    fromInputField = TextEditingController();
+
+    fromInputField.addListener(() {
+      setState(() {
+        variabletext = fromInputField.text;
+      });
+    });
+  }
+
+  final List<String> listobjects = [];
 
   @override
   Widget build(BuildContext context) {
@@ -158,10 +200,10 @@ class SecondPage extends StatelessWidget {
     );
   }
 
-  //översta texten för att förklara
+  //förklarande text
   Widget newReminderText() {
     return Container(
-      child: const Text('New reminder:'),
+      child: const Text('Add a new reminder:'),
       margin: const EdgeInsets.only(top: 20.0, bottom: 20.0),
     );
   }
@@ -169,7 +211,14 @@ class SecondPage extends StatelessWidget {
   //textfältet
   Widget inputReminder() {
     return Container(
-      child: const TextField(),
+      child: TextField(
+        decoration: InputDecoration(hintText: 'Example: Buy groceries'),
+        controller: fromInputField,
+        onSubmitted: (vari) {
+          Navigator.pop(context, Reminder(variabletext: variabletext));
+          fromInputField.clear();
+        },
+      ),
       margin: const EdgeInsets.only(left: 20.0, right: 20.0),
     );
   }
@@ -177,13 +226,59 @@ class SecondPage extends StatelessWidget {
   //"add"-knappen
   Widget addReminderButton() {
     return Container(
-      margin: const EdgeInsets.only(top: 20.0),
-      child: OutlinedButton(
-        child: const Text('+ Add'),
-        onPressed: () {
-          //work in progress
-        },
-      ),
+        padding: EdgeInsets.all(20),
+        child: OutlinedButton(
+            child: const Text('+ Add'),
+            onPressed: () {
+              Navigator.pop(context, Reminder(variabletext: variabletext));
+            }));
+  }
+}
+
+class Reminder {
+  String variabletext;
+  Reminder({required this.variabletext});
+}
+
+//Hanterar listan över påminnelser
+//Innehåller:
+//  - skapande av listan tillsammans med andra element
+//  - knapp för att ta bort påminnelser
+class ReminderList extends StatelessWidget {
+  const ReminderList(this.list, {Key? key}) : super(key: key);
+
+  final List<Reminder> list;
+  final bool checked = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      children: list.map((task) => _listOfReminders(context, task)).toList(),
+      shrinkWrap: true,
     );
+  }
+
+  //rad med påminnelse, ruta och borttagningsknapp
+  Widget _listOfReminders(BuildContext context, task) {
+    return ListTile(
+        leading: Checkboxes(),
+        title: Text(
+          task.variabletext,
+          // style: TextStyle(
+          //     decoration:   isChecked
+          //         ? TextDecoration.lineThrough
+          //         : TextDecoration.none),
+        ),
+        trailing: deleteButton(context, task));
+  }
+
+  //soptunneknappen
+  Widget deleteButton(context, task) {
+    return IconButton(
+        icon: Icon(Icons.delete),
+        onPressed: () {
+          var state = Provider.of<MyState>(context, listen: false);
+          state.removeTask(task);
+        });
   }
 }
