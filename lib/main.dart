@@ -2,24 +2,75 @@
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'InternetAPI.dart';
+
+class Reminder {
+  String id;
+  String title;
+  bool done;
+
+  Reminder({this.id = '', required this.title, this.done = false});
+
+  static Map<String, dynamic> toJson(Reminder task) {
+    return {
+      'title': task.title,
+      'done': task.done,
+    };
+  }
+
+  static Reminder fromJson(Map<String, dynamic> json) {
+    return Reminder(
+      id: json['id'],
+      title: json['title'],
+      done: json['done'],
+    );
+  }
+}
 
 class MyState extends ChangeNotifier {
-  final List<Reminder> _list = [];
+  List<Reminder> _list = [];
+  List<Reminder> _filteredList = [];
 
-  List<Reminder> get list => _list;
-  void getList() {}
+  List<Reminder> get filteredList => _filteredList;
 
-  void newTask(Reminder task) {
-    _list.add(task);
+  Future getList() async {
+    List<Reminder> list = await InternetAPI.getReminders();
+    _list = list;
+    _filteredList = _list;
+    // print(_list);
     notifyListeners();
   }
 
-  void removeTask(Reminder task) {
-    _list.remove(task);
+  void newTask(Reminder task) async {
+    _list = await InternetAPI.createTask(task);
+    _filteredList = _list;
+    // print(_list);
     notifyListeners();
   }
 
-  //work in progress
+  void removeTask(Reminder task) async {
+    _list = await InternetAPI.deleteTask(task.id);
+    _filteredList = _list;
+    // print(_list);
+    notifyListeners();
+  }
+
+  void checkboxPressed(Reminder newValue, task) async {
+    _list = await InternetAPI.updateCheckbox(newValue, task);
+    // print(_list);
+    notifyListeners();
+  }
+
+  void filterTasks(value) {
+    if (value == 0) {
+      _filteredList = _list;
+    } else if (value == 1) {
+      _filteredList = _list.where((task) => task.done == true).toList();
+    } else if (value == 2) {
+      _filteredList = _list.where((task) => task.done == false).toList();
+    }
+    notifyListeners();
+  }
 }
 
 void main() {
@@ -56,10 +107,9 @@ class MainPage extends StatefulWidget {
 
 //startsida
 //innehåller:
-//  - filtreringsknapp (work in progress),
+//  - filtreringsknapp
 //  - listan
 //  - samt knapp för att skapa ny påminnelse
-
 class MainPageState extends State<StatefulWidget> {
   @override
   Widget build(BuildContext context) {
@@ -77,9 +127,9 @@ class MainPageState extends State<StatefulWidget> {
       body: Center(
         child: Column(
           children: [
-            (Consumer<MyState>(
-              builder: (context, state, child) => ReminderList(state._list),
-            )),
+            Consumer<MyState>(
+              builder: (context, state, child) => ReminderList(),
+            ),
           ],
         ),
       ),
@@ -91,28 +141,25 @@ class MainPageState extends State<StatefulWidget> {
           size: 50,
         ),
         onPressed: () async {
-          var addreminder = await Navigator.push(
+          Navigator.push(
             context,
             MaterialPageRoute(
-                builder: (context) => SecondPage(Reminder(variabletext: ''))),
+              builder: (context) => SecondPage(),
+            ),
           );
-
-          if (addreminder != null) {
-            Provider.of<MyState>(context, listen: false).newTask(addreminder);
-          }
         },
       ),
     );
   }
 
-  //filtrering av påminnelser (work in progress)
+  //filtrering av påminnelser
   //  Alternativ: "all", "done" och "not done"
   Widget filterListButton() {
     return PopupMenuButton(
       icon: const Icon(Icons.miscellaneous_services),
       offset: const Offset(0, 50),
       onSelected: (value) {
-        // Provider.of<MyState>(context, listen: false).filterList(value);
+        Provider.of<MyState>(context, listen: false).filterTasks(value);
       },
       itemBuilder: (context) => [
         const PopupMenuItem(child: Text('All'), value: 0),
@@ -123,64 +170,15 @@ class MainPageState extends State<StatefulWidget> {
   }
 }
 
-//hanterar kryssrutorna
-class Checkboxes extends StatefulWidget {
-  const Checkboxes({Key? key, bool? value}) : super(key: key);
+// andra sidan
+// innehåller:
+//   - förklarande text
+//   - textfält
+//   - "lägg till"-knapp
+class SecondPage extends StatelessWidget {
+  SecondPage({Key? key}) : super(key: key);
 
-  @override
-  State<Checkboxes> createState() => CheckboxState();
-}
-
-class CheckboxState extends State<Checkboxes> {
-  late bool isChecked = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return Checkbox(
-      value: isChecked,
-      onChanged: (bool? value) {
-        setState(() {
-          isChecked = value!;
-        });
-      },
-    );
-  }
-}
-
-class SecondPage extends StatefulWidget {
-  final Reminder task;
-
-  const SecondPage(this.task, {Key? key}) : super(key: key);
-
-  @override
-  State<StatefulWidget> createState() {
-    // ignore: no_logic_in_create_state
-    return _SecondPage(task);
-  }
-}
-
-//andra sidan
-//innehåller
-//  - förklarande text
-//  - textfältet för inmatning av påminnelse
-//  - knapp för att lägga till påminnelse
-class _SecondPage extends State<SecondPage> {
-  late String variabletext;
-  late TextEditingController fromInputField;
-
-  _SecondPage(Reminder task) {
-    variabletext = task.variabletext;
-
-    fromInputField = TextEditingController();
-
-    fromInputField.addListener(() {
-      setState(() {
-        variabletext = fromInputField.text;
-      });
-    });
-  }
-
-  final List<String> listobjects = [];
+  final fromInputField = TextEditingController();
 
   @override
   Widget build(BuildContext context) {
@@ -192,8 +190,8 @@ class _SecondPage extends State<SecondPage> {
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             newReminderText(),
-            inputReminder(),
-            addReminderButton(),
+            inputReminder(context),
+            addReminderButton(context),
           ],
         ),
       ),
@@ -209,13 +207,15 @@ class _SecondPage extends State<SecondPage> {
   }
 
   //textfältet
-  Widget inputReminder() {
+  Widget inputReminder(context) {
     return Container(
       child: TextField(
         decoration: InputDecoration(hintText: 'Example: Buy groceries'),
         controller: fromInputField,
-        onSubmitted: (vari) {
-          Navigator.pop(context, Reminder(variabletext: variabletext));
+        onSubmitted: (variabletext) {
+          Provider.of<MyState>(context, listen: false).newTask(
+            Reminder(title: fromInputField.text),
+          );
           fromInputField.clear();
         },
       ),
@@ -224,61 +224,78 @@ class _SecondPage extends State<SecondPage> {
   }
 
   //"add"-knappen
-  Widget addReminderButton() {
+  Widget addReminderButton(context) {
     return Container(
-        padding: EdgeInsets.all(20),
-        child: OutlinedButton(
-            child: const Text('+ Add'),
-            onPressed: () {
-              Navigator.pop(context, Reminder(variabletext: variabletext));
-            }));
+      padding: EdgeInsets.all(20),
+      child: OutlinedButton(
+        child: const Text('+ Add'),
+        onPressed: () {
+          Provider.of<MyState>(context, listen: false).newTask(
+            Reminder(title: fromInputField.text),
+          );
+          fromInputField.clear();
+        },
+      ),
+    );
   }
 }
 
-class Reminder {
-  String variabletext;
-  Reminder({required this.variabletext});
-}
-
-//Hanterar listan över påminnelser
-//Innehåller:
-//  - skapande av listan tillsammans med andra element
-//  - knapp för att ta bort påminnelser
+// listan med påminnelser
+// innehåller:
+//  - listan
+//  - checkbox- samt "ta-bort"-knappar
 class ReminderList extends StatelessWidget {
-  const ReminderList(this.list, {Key? key}) : super(key: key);
-
-  final List<Reminder> list;
-  final bool checked = false;
+  const ReminderList({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    return ListView(
-      children: list.map((task) => _listOfReminders(context, task)).toList(),
-      shrinkWrap: true,
+    return Consumer<MyState>(
+      builder: (context, state, child) => _reminderList(state.filteredList),
     );
   }
 
-  //rad med påminnelse, ruta och borttagningsknapp
-  Widget _listOfReminders(BuildContext context, task) {
+  Widget _reminderList(list) {
+    return ListView.builder(
+      itemCount: list.length,
+      scrollDirection: Axis.vertical,
+      shrinkWrap: true,
+      itemBuilder: (BuildContext context, int index) {
+        return _listOfReminders(context, list[index], index);
+      },
+    );
+  }
+
+  Widget _listOfReminders(context, Reminder task, index) {
     return ListTile(
-        leading: Checkboxes(),
-        title: Text(
-          task.variabletext,
-          // style: TextStyle(
-          //     decoration:   isChecked
-          //         ? TextDecoration.lineThrough
-          //         : TextDecoration.none),
-        ),
-        trailing: deleteButton(context, task));
+      leading: checkboxButton(context, task),
+      title: Text(
+        task.title,
+        style: TextStyle(
+            decoration:
+                task.done ? TextDecoration.lineThrough : TextDecoration.none),
+      ),
+      trailing: deleteButton(context, task),
+    );
+  }
+
+  //checkboxarna
+  Widget checkboxButton(context, Reminder task) {
+    return Checkbox(
+      value: task.done,
+      onChanged: (bool? newValue) {
+        Provider.of<MyState>(context, listen: false)
+            .checkboxPressed(task, newValue);
+      },
+    );
   }
 
   //soptunneknappen
-  Widget deleteButton(context, task) {
+  Widget deleteButton(context, Reminder task) {
     return IconButton(
-        icon: Icon(Icons.delete),
-        onPressed: () {
-          var state = Provider.of<MyState>(context, listen: false);
-          state.removeTask(task);
-        });
+      icon: Icon(Icons.delete),
+      onPressed: () {
+        Provider.of<MyState>(context, listen: false).removeTask(task);
+      },
+    );
   }
 }
