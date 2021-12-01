@@ -41,7 +41,7 @@ class MyState extends ChangeNotifier {
     notifyListeners();
   }
 
-  void newTask(Reminder task) async {
+  void newTask(Reminder task, [void pop]) async {
     _list = await InternetAPI.createTask(task);
     _filteredList = _list;
     // print(_list);
@@ -215,6 +215,7 @@ class SecondPage extends StatelessWidget {
         onSubmitted: (variabletext) {
           Provider.of<MyState>(context, listen: false).newTask(
             Reminder(title: fromInputField.text),
+            Navigator.pop(context),
           );
           fromInputField.clear();
         },
@@ -232,6 +233,7 @@ class SecondPage extends StatelessWidget {
         onPressed: () {
           Provider.of<MyState>(context, listen: false).newTask(
             Reminder(title: fromInputField.text),
+            Navigator.pop(context),
           );
           fromInputField.clear();
         },
@@ -283,6 +285,7 @@ class ReminderList extends StatelessWidget {
     return Checkbox(
       value: task.done,
       onChanged: (bool? newValue) {
+        task.done = newValue!;
         Provider.of<MyState>(context, listen: false)
             .checkboxPressed(task, newValue);
       },
