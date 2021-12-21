@@ -1,8 +1,8 @@
 // ignore_for_file: file_names
 
+import 'states.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'main.dart';
 
 //nycklar
 const apiURL = 'https://todoapp-api-pyq5q.ondigitalocean.app';
@@ -61,7 +61,7 @@ class InternetAPI {
   // checkbox uppdatera status //
   static Future<List<Reminder>> updateCheckbox(Reminder task, newValue) async {
     Map<String, dynamic> json = Reminder.toJson(task);
-    String id = task.id;
+    var id = task.id;
     task.done = newValue;
     var bodyText = jsonEncode(json);
     var response = await http.put(
@@ -71,7 +71,7 @@ class InternetAPI {
     );
     bodyText = response.body;
     var list = jsonDecode(bodyText);
-    // print(bodyText);
+    print('ID: $id, text: $bodyText');
     return list.map<Reminder>(
       (data) {
         return Reminder.fromJson(data);
